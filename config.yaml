@@ -3,9 +3,9 @@
 # No quotes needed for simple values
 # "#" for comments
 
-# Not used in the project
-quick-test:
+# This block is meant for debuging .yaml file (Not used in the project)
+debug-yaml:
   message: "I am working!!!!!!!!!"
-  number: 10
+  number: 1000
 
 # Project configuration
