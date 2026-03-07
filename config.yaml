@@ -3,5 +3,9 @@
 # No quotes needed for simple values
 # "#" for comments
 
+# Not used in the project
+quick-test:
+  message: "I am working!!!!!!!!!"
+  number: 10
 
-test: I am working!!!!!!!!!
+# Project configuration
