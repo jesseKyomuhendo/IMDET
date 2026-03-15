@@ -1,5 +1,5 @@
 pyyaml
 scikit-learn
-torch
-torchvision
 numpy
+tensorflow
+Pillow

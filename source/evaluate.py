@@ -5,7 +5,7 @@ Reusable evaluation functions for the IMD project.
 Called by both train.py (on validation set) and test.py (on test set).
 
 Functions:
-    evaluate_model  : runs model on a dataloader, returns all metrics
+    evaluate_model  : runs model on a dataset, returns all metrics
     print_results   : prints a formatted summary of results
     save_results    : saves results to a JSON file in results/
 
@@ -18,7 +18,6 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 
-import torch
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -30,37 +29,30 @@ from sklearn.metrics import (
 from settings.SettingsAssistant import CONFIG
 
 
-def evaluate_model(model, dataloader, device, class_names):
+def evaluate_model(model, dataset, class_names):
     """
-    Run model on a dataloader and compute all evaluation metrics.
+    Run model on a tf.data.Dataset and compute all evaluation metrics.
 
     Args:
-        model       : trained PyTorch model
-        dataloader  : DataLoader for the split to evaluate
-        device      : torch.device (cpu or cuda)
+        model       : trained Keras model
+        dataset     : tf.data.Dataset (batched, not shuffled)
         class_names : list of class name strings e.g. ['authentic', 'copy_move', 'splicing']
 
     Returns:
         dict with keys: accuracy, f1_per_class, f1_macro, auc, confusion_matrix, report
     """
-    model.eval()
-
     all_preds  = []
     all_labels = []
     all_probs  = []
 
-    with torch.no_grad():
-        for images, labels in dataloader:
-            images = images.to(device)
-            labels = labels.to(device)
+    for images, labels in dataset:
+        probs  = model(images, training=False).numpy()
+        preds  = np.argmax(probs, axis=1)
+        labels = labels.numpy()
 
-            outputs = model(images)
-            probs   = torch.softmax(outputs, dim=1)
-            preds   = torch.argmax(probs, dim=1)
-
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-            all_probs.extend(probs.cpu().numpy())
+        all_preds.extend(preds)
+        all_labels.extend(labels)
+        all_probs.extend(probs)
 
     all_preds  = np.array(all_preds)
     all_labels = np.array(all_labels)
@@ -91,12 +83,12 @@ def evaluate_model(model, dataloader, device, class_names):
     )
 
     return {
-        "accuracy"     : round(float(accuracy), 4),
-        "f1_per_class" : {class_names[i]: round(float(f1_per_class[i]), 4) for i in range(len(class_names))},
-        "f1_macro"     : round(float(f1_macro), 4),
-        "auc"          : round(float(auc), 4) if auc is not None else "N/A",
+        "accuracy"        : round(float(accuracy), 4),
+        "f1_per_class"    : {class_names[i]: round(float(f1_per_class[i]), 4) for i in range(len(class_names))},
+        "f1_macro"        : round(float(f1_macro), 4),
+        "auc"             : round(float(auc), 4) if auc is not None else "N/A",
         "confusion_matrix": cm.tolist(),
-        "report"       : report,
+        "report"          : report,
     }
 
 
@@ -127,11 +119,8 @@ def save_results(results, split_name="test"):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename  = results_dir / f"{split_name}_results_{timestamp}.json"
 
-    # confusion_matrix is already a list (JSON serializable)
     with open(filename, "w") as f:
         json.dump(results, f, indent=2)
 
     print(f"  Results saved to: {filename}")
     return filename
-
-

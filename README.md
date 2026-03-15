@@ -2,6 +2,8 @@
 
 ## Setup
 
+To use tensorflow on Windows you need Python 3.11 version or lower  
+
 ### 1. Create a Virtual Environment
 
 **Windows:**

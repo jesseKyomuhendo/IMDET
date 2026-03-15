@@ -5,7 +5,7 @@
 
 # This block is meant for debugging .yaml file (Not used in the project)
 debug-yaml:
-  message: "Sambrina"
+  message: "Image manipulation detection"
   number: 1000
 
 # ─────────────────────────────────────────
@@ -36,7 +36,6 @@ training:
   epochs: 50
   batch_size: 32
   learning_rate: 0.0001
-  num_workers: 4                   # Dataloader workers
   early_stopping_patience: 5      # Stop if val loss does not improve for N epochs
 
 # Model
@@ -44,13 +43,11 @@ model:
   backbone: resnet50               # Options: resnet50, vgg16
   pretrained: true                 # Use ImageNet pretrained weights
   num_classes: 3
-  save_path: model/best_model.pth  # Where to save the trained model
+  save_path: model/best_model.keras  # Where to save the trained model
 
 # Image preprocessing
 image:
   size: 224                        # Resize all images to size x size
-  mean: [0.485, 0.456, 0.406]      # ImageNet mean (used for normalization)
-  std: [0.229, 0.224, 0.225]       # ImageNet std  (used for normalization)
 
 # Evaluation
 evaluation:
