@@ -18,7 +18,7 @@ IMDET/
 ├── settings/
 │   └── SettingsAssistant.py
 ├── source/
-│   ├── dataset.py         ← Data pipeline
+│   ├── dataset.py         ← Data pipeline. Loads images from disk in batches and prepares them for the model (resize, normalize, augment)
 │   ├── evaluate.py        ← Evaluation functions
 │   ├── model.py           ← Two-stream architecture
 │   ├── split_dataset.py   ← Dataset split script
