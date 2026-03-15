@@ -17,6 +17,7 @@ Usage:
     Press IDE run button or run the following CLI command: python source/split_dataset.py
 """
 
+# Imports
 import csv
 import random
 from pathlib import Path

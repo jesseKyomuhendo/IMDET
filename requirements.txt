@@ -1,1 +1,5 @@
 pyyaml
+scikit-learn
+torch
+torchvision
+numpy
