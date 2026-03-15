@@ -208,3 +208,18 @@ __marimo__/
 
 #MAC files
 .DS_Store
+
+#Ignore all folder content
+data/*
+#keep this file in folder so Git tracks it
+!data/.gitkeep
+
+
+
+
+
+
+
+
+
+
