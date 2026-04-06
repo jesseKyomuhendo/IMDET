@@ -18,6 +18,7 @@ import os
 import csv
 import numpy as np
 from pathlib import Path
+import tensorflow_io as tfio
 
 import tensorflow as tf
 
@@ -31,19 +32,19 @@ CLASS_TO_IDX = {cls: i for i, cls in enumerate(CLASS_NAMES)}
 
 
 def _load_image(filepath, label):
-    """
-    Load and preprocess a single image.
-    - Reads file (supports jpg, tif, bmp, png)
-    - Resizes to image.size x image.size
-    - Normalizes to [0, 1]
-    """
     size = CONFIG["image"]["size"]
+
 
     raw   = tf.io.read_file(filepath)
 
-    # Decode — try jpeg first, fall back to png/bmp via decode_image
-    image = tf.io.decode_image(raw, channels=3, expand_animations=False)
-    image = tf.cast(image, tf.float32) / 255.0
+    # Use tensorflow_io for TIFF support
+    image = tf.cond(
+        tf.strings.regex_full_match(filepath, r'.*\.(tif|tiff|TIF|TIFF)'),
+        lambda: tf.cast(tfio.image.decode_tiff(raw)[..., :3], tf.float32),
+        lambda: tf.cast(tf.io.decode_image(raw, channels=3, expand_animations=False), tf.float32)
+    )
+
+    image = image / 255.0
     image = tf.image.resize(image, [size, size])
     image.set_shape([size, size, 3])
 
