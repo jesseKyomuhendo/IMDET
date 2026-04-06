@@ -33,23 +33,12 @@ CLASS_TO_IDX = {cls: i for i, cls in enumerate(CLASS_NAMES)}
 
 def _load_image(filepath, label):
     size = CONFIG["image"]["size"]
-
-
     raw   = tf.io.read_file(filepath)
-
-    # Use tensorflow_io for TIFF support
-    image = tf.cond(
-        tf.strings.regex_full_match(filepath, r'.*\.(tif|tiff|TIF|TIFF)'),
-        lambda: tf.cast(tfio.image.decode_tiff(raw)[..., :3], tf.float32),
-        lambda: tf.cast(tf.io.decode_image(raw, channels=3, expand_animations=False), tf.float32)
-    )
-
-    image = image / 255.0
+    image = tf.io.decode_image(raw, channels=3, expand_animations=False)
+    image = tf.cast(image, tf.float32) / 255.0
     image = tf.image.resize(image, [size, size])
     image.set_shape([size, size, 3])
-
     return image, label
-
 
 def _augment(image, label):
     """
