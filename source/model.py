@@ -69,7 +69,7 @@ def build_srm_filters():
     return filters
 
 
-@keras.saving.register_keras_serializable()
+tf.keras.utils.register_keras_serializable()
 def _srm_conv_layer(x):
     """
     Apply SRM filters to each colour channel independently,
