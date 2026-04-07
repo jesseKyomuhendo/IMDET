@@ -69,6 +69,7 @@ def build_srm_filters():
     return filters
 
 
+@keras.saving.register_keras_serializable()
 def _srm_conv_layer(x):
     """
     Apply SRM filters to each colour channel independently,
@@ -78,11 +79,10 @@ def _srm_conv_layer(x):
     """
     srm_filters = build_srm_filters()  # (3, 3, 1, 3)
 
-    channels = tf.split(x, num_or_size_splits=3, axis=-1)  # 3 x (batch, H, W, 1)
+    channels = tf.split(x, num_or_size_splits=3, axis=-1)
     outputs  = []
 
     for ch in channels:
-        # Apply fixed SRM filters — not trainable
         filtered = tf.nn.conv2d(
             ch,
             filters=tf.constant(srm_filters),
@@ -91,8 +91,7 @@ def _srm_conv_layer(x):
         )
         outputs.append(filtered)
 
-    return tf.concat(outputs, axis=-1)  # (batch, H, W, 9)
-
+    return tf.concat(outputs, axis=-1)
 
 # ── Model Builder ──────────────────────────────────────────────────────────────
 
