@@ -37,6 +37,7 @@ def main():
 
     # ── Load model ────────────────────────────────────────────────
     print(f"\nLoading model from: {save_path}")
+    keras.config.enable_unsafe_deserialization()
     model = keras.models.load_model(
         save_path,
         custom_objects={"_srm_conv_layer": _srm_conv_layer}
