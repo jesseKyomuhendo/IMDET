@@ -36,7 +36,7 @@ training:
   epochs: 50
   batch_size: 32
   learning_rate: 0.0001
-  early_stopping_patience: 5      # Stop if val loss does not improve for N epochs
+  early_stopping_patience: 15      # Stop if val loss does not improve for N epochs
 
 # Model
 model:

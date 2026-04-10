@@ -4,163 +4,151 @@ model.py
 Defines the two-stream hybrid CNN architecture for image manipulation detection.
 
 Architecture:
-    Stream 1 (RGB)   : ResNet50 backbone pretrained on ImageNet
+    Stream 1 (RGB)   : ResNet50 backbone pretrained on ImageNet (frozen by default)
                        Extracts semantic and visual features
     Stream 2 (Noise) : SRM (Spatial Rich Model) constrained conv layers
                        Extracts noise residuals and texture artefacts
-    Fusion           : Concatenates both streams
+                       Two specialised heads: copy-move and splicing
+    Attention        : Dynamically weights RGB vs noise stream contribution
+    Fusion           : Weighted combination of both streams
     Classifier head  : Fully connected layers → 3-class softmax output
                        Classes: authentic | copy_move | splicing
 
 Functions:
-    build_srm_filters : returns the SRM filter bank as a numpy array
-    build_model       : builds and returns the full two-stream Keras model
+    build_model : builds and returns the full two-stream Keras model
 
 Usage (from other modules):
     from source.model import build_model
     model = build_model()
 """
 
-import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers
 from tensorflow.keras.applications import ResNet50
 
 from settings.SettingsAssistant import CONFIG
 
 
-# ── SRM Filter Bank ────────────────────────────────────────────────────────────
-# SRM (Spatial Rich Model) filters extract noise residuals left by manipulation.
-# These are fixed, non-trainable filters — they are not learned during training.
+# ── SRM Filter ─────────────────────────────────────────────────────────────────
+# Laplacian high-pass filter applied depthwise to detect noise residuals
+# left by manipulation. Fixed, non-trainable — not learned during training.
 
-def build_srm_filters():
-    """
-    Returns a set of 3 SRM high-pass filters as a numpy array.
-    Shape: (3, 3, 1, 3) — 3x3 kernel, 1 input channel, 3 filters.
-    Applied per channel independently in the noise stream.
-    """
-    # Filter 1: Simple high-pass (centre surround)
-    f1 = np.array([
-        [ 0,  0,  0],
-        [ 0,  1, -1],
-        [ 0,  0,  0]
-    ], dtype=np.float32)
-
-    # Filter 2: Horizontal edge
-    f2 = np.array([
-        [ 0,  0,  0],
-        [ 0,  2, -1],
-        [ 0, -1,  0]
-    ], dtype=np.float32)
-
-    # Filter 3: Laplacian (detects noise residuals in all directions)
-    f3 = np.array([
-        [-1, -1, -1],
-        [-1,  8, -1],
-        [-1, -1, -1]
-    ], dtype=np.float32) / 8.0
-
-    # Stack into shape (3, 3, 1, 3)
-    filters = np.stack([f1, f2, f3], axis=-1)        # (3, 3, 3)
-    filters = np.expand_dims(filters, axis=2)         # (3, 3, 1, 3)
-    filters = np.transpose(filters, (0, 1, 2, 3))     # (3, 3, 1, 3)
-
-    return filters
-
-
-tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable()
 def _srm_conv_layer(x):
     """
-    Apply SRM filters to each colour channel independently,
-    then concatenate the results.
+    Apply a depthwise Laplacian SRM filter to extract noise residuals.
+    Measures the difference between each pixel and its neighbours.
     Input shape : (batch, H, W, 3)
-    Output shape: (batch, H, W, 9)  — 3 filters x 3 channels
+    Output shape: (batch, H, W, 3)
     """
-    srm_filters = build_srm_filters()  # (3, 3, 1, 3)
+    # Laplacian kernel — detects edges and noise in all directions
+    kernel = tf.constant(
+        [[[-1.0], [-1.0], [-1.0]],
+         [[-1.0], [ 8.0], [-1.0]],
+         [[-1.0], [-1.0], [-1.0]]],
+        dtype=tf.float32
+    )
+    # Apply to all 3 channels independently (depthwise)
+    kernel = tf.repeat(kernel, repeats=3, axis=2)   # (3, 3, 3)
+    kernel = tf.reshape(kernel, (3, 3, 3, 1))        # (3, 3, 3, 1)
 
-    channels = tf.split(x, num_or_size_splits=3, axis=-1)
-    outputs  = []
+    x = tf.cast(x, tf.float32)
+    x = tf.nn.depthwise_conv2d(x, filter=kernel, strides=[1, 1, 1, 1], padding="SAME")
+    return x
 
-    for ch in channels:
-        filtered = tf.nn.conv2d(
-            ch,
-            filters=tf.constant(srm_filters),
-            strides=[1, 1, 1, 1],
-            padding="SAME"
-        )
-        outputs.append(filtered)
-
-    return tf.concat(outputs, axis=-1)
 
 # ── Model Builder ──────────────────────────────────────────────────────────────
 
-def build_model():
+def build_model(train_backbone=False):
     """
     Build and return the two-stream hybrid CNN model.
+
+    Args:
+        train_backbone : whether to unfreeze ResNet50 weights for fine-tuning.
+                         Default False — backbone frozen, only head trains.
 
     Returns:
         Compiled Keras model ready for training.
     """
-    cfg        = CONFIG["model"]
-    img_size   = CONFIG["image"]["size"]
+    cfg         = CONFIG["model"]
+    img_size    = CONFIG["image"]["size"]
     num_classes = cfg["num_classes"]
-    lr         = CONFIG["training"]["learning_rate"]
+    lr          = CONFIG["training"]["learning_rate"]
 
     inputs = keras.Input(shape=(img_size, img_size, 3), name="input")
 
-    # ── Stream 1: RGB ──────────────────────────────────────────────
-    # ResNet50 pretrained on ImageNet, top layers removed
-    # Preprocess input using ResNet50's expected normalisation
-    rgb_preprocessed = keras.applications.resnet50.preprocess_input(inputs)
+    # Normalize pixel values [0-255] → [0.0-1.0] inside the model
+    x = layers.Rescaling(1.0 / 255.0, name="rescaling")(inputs)
 
+    # ── Stream 1: RGB ──────────────────────────────────────────────
+    # ResNet50 pretrained on ImageNet — frozen by default to prevent
+    # the large backbone from overpowering the noise stream early in training
     backbone = ResNet50(
         include_top=False,
         weights="imagenet" if cfg["pretrained"] else None,
-        input_tensor=rgb_preprocessed,
-        pooling="avg"          # Global average pooling → flat feature vector
+        pooling="avg"
     )
+    backbone.trainable = train_backbone
 
-    # Freeze backbone initially — fine-tune later if needed
-    backbone.trainable = True
-
-    rgb_features = backbone.output   # Shape: (batch, 2048)
+    rgb_features = backbone(x)   # Shape: (batch, 2048)
 
     # ── Stream 2: Noise / SRM ──────────────────────────────────────
-    # Apply fixed SRM filters to extract noise residuals
-    noise = layers.Lambda(_srm_conv_layer, name="srm_filters")(inputs)
-                                                        # (batch, H, W, 9)
+    # Fixed SRM filter extracts noise residuals invisible to the human eye
+    x_noise = layers.Lambda(_srm_conv_layer, name="srm_filters")(x)
+    x_noise = layers.BatchNormalization(name="noise_bn0")(x_noise)
 
-    # Learnable conv layers on top of SRM output
-    noise = layers.Conv2D(32, (3, 3), padding="same", activation="relu",
-                          name="noise_conv1")(noise)
-    noise = layers.BatchNormalization(name="noise_bn1")(noise)
-    noise = layers.MaxPooling2D((2, 2), name="noise_pool1")(noise)
+    # Shared noise conv layers
+    n = layers.Conv2D(32, 3, padding="same", activation="relu", name="noise_conv1")(x_noise)
+    n = layers.MaxPooling2D(name="noise_pool1")(n)
 
-    noise = layers.Conv2D(64, (3, 3), padding="same", activation="relu",
-                          name="noise_conv2")(noise)
-    noise = layers.BatchNormalization(name="noise_bn2")(noise)
-    noise = layers.MaxPooling2D((2, 2), name="noise_pool2")(noise)
+    n = layers.Conv2D(64, 3, padding="same", activation="relu", name="noise_conv2")(n)
+    n = layers.MaxPooling2D(name="noise_pool2")(n)
 
-    noise = layers.Conv2D(128, (3, 3), padding="same", activation="relu",
-                          name="noise_conv3")(noise)
-    noise = layers.BatchNormalization(name="noise_bn3")(noise)
+    n = layers.Conv2D(128, 3, padding="same", activation="relu", name="noise_conv3")(x_noise)
+    n = layers.GlobalAveragePooling2D(name="noise_gap")(n)   # (batch, 128)
 
-    noise = layers.GlobalAveragePooling2D(name="noise_gap")(noise)
-                                                        # (batch, 128)
+    # Specialised copy-move head — focuses on intra-image region features
+    cm = layers.Dense(128, activation="relu", name="cm_fc1")(n)
+    cm = layers.Dense(64,  activation="relu", name="cm_fc2")(cm)
+
+    # Specialised splicing head — focuses on cross-image boundary features
+    sp = layers.Dense(128, activation="relu", name="sp_fc1")(n)
+    sp = layers.Dense(64,  activation="relu", name="sp_fc2")(sp)
+
+    # Combine both heads → noise feature vector
+    noise_features = layers.Concatenate(name="noise_fusion")([cm, sp])  # (batch, 128)
+
+    # ── Attention ──────────────────────────────────────────────────
+    # Dynamically weights how much the RGB stream vs noise stream
+    # contributes to the final prediction
+    fused_input = layers.Concatenate(name="pre_attention")([rgb_features, noise_features])
+
+    att = layers.Dense(2, activation="softmax", name="attention")(fused_input)
+    att_rgb   = layers.Lambda(lambda x: x[:, 0:1], name="att_rgb")(att)
+    att_noise = layers.Lambda(lambda x: x[:, 1:2], name="att_noise")(att)
+
+    # Expand for element-wise multiplication
+    rgb_exp   = layers.Lambda(lambda x: tf.expand_dims(x, axis=1), name="rgb_exp")(rgb_features)
+    noise_exp = layers.Lambda(lambda x: tf.expand_dims(x, axis=1), name="noise_exp")(noise_features)
+
+    att_rgb_exp   = layers.Lambda(lambda x: tf.expand_dims(x, axis=-1), name="att_rgb_exp")(att_rgb)
+    att_noise_exp = layers.Lambda(lambda x: tf.expand_dims(x, axis=-1), name="att_noise_exp")(att_noise)
+
+    rgb_weighted   = layers.Multiply(name="rgb_weighted")([rgb_exp,   att_rgb_exp])
+    noise_weighted = layers.Multiply(name="noise_weighted")([noise_exp, att_noise_exp])
 
     # ── Fusion ─────────────────────────────────────────────────────
-    # Concatenate RGB and noise feature vectors
-    fused = layers.Concatenate(name="fusion")([rgb_features, noise])
-                                                        # (batch, 2048 + 128)
+    fused = layers.Concatenate(axis=-1, name="fusion")([
+        layers.Flatten(name="rgb_flat")(rgb_weighted),
+        layers.Flatten(name="noise_flat")(noise_weighted),
+    ])
 
     # ── Classifier Head ────────────────────────────────────────────
-    x = layers.Dense(512, activation="relu", name="fc1")(fused)
-    x = layers.Dropout(0.5, name="dropout1")(x)
-    x = layers.Dense(128, activation="relu", name="fc2")(x)
-    x = layers.Dropout(0.3, name="dropout2")(x)
-    outputs = layers.Dense(num_classes, activation="softmax",
-                           name="output")(x)
+    fused = layers.Dense(128, activation="relu", name="fc1")(fused)
+    fused = layers.Dropout(0.5, name="dropout")(fused)
+
+    outputs = layers.Dense(num_classes, activation="softmax", name="output")(fused)
 
     # ── Compile ────────────────────────────────────────────────────
     model = keras.Model(inputs=inputs, outputs=outputs, name="IMD_TwoStream")

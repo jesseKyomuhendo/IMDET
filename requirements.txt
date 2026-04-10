@@ -3,4 +3,3 @@ scikit-learn
 numpy
 tensorflow
 Pillow
-tensorflow-io

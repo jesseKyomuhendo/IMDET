@@ -24,8 +24,8 @@ from tensorflow import keras
 
 os.chdir(Path(__file__).resolve().parent.parent)
 
-from source.dataset import get_datasets
-from source.model   import build_model
+from source.dataset  import get_datasets
+from source.model    import build_model
 from source.evaluate import evaluate_model, print_results, save_results
 from settings.SettingsAssistant import CONFIG
 
@@ -41,19 +41,33 @@ def main():
 
     # ── Model ─────────────────────────────────────────────────────
     print("Building model...")
-    model = build_model()
+    model = build_model(train_backbone=False)
     print(f"  Model: {model.name}")
     print(f"  Total params: {model.count_params():,}\n")
+
+    # ── Class Weights ─────────────────────────────────────────────
+    # Handles class imbalance: authentic=7491, copy_move=3295, splicing=1828
+    # Higher weight = model penalised more for getting that class wrong
+    class_weight = {
+        0: 1.0,            # authentic  — majority class, no boost
+        1: 7491 / 3295,    # copy_move  — ~2.3x weight
+        2: 7491 / 1828,    # splicing   — ~4.1x weight
+    }
+    print(f"Class weights:")
+    for cls, w in zip(class_names, class_weight.values()):
+        print(f"  {cls:<14} : {w:.4f}")
+    print()
 
     # ── Callbacks ─────────────────────────────────────────────────
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     callbacks = [
-        # Save best model based on val_accuracy
+        # Save best model based on val_loss
         keras.callbacks.ModelCheckpoint(
             filepath=save_path,
-            monitor="val_accuracy",
+            monitor="val_loss",
             save_best_only=True,
+            mode="min",
             verbose=1
         ),
         # Stop training if val_loss does not improve for N epochs
@@ -67,7 +81,7 @@ def main():
         keras.callbacks.ReduceLROnPlateau(
             monitor="val_loss",
             factor=0.5,
-            patience=3,
+            patience=5,
             min_lr=1e-6,
             verbose=1
         ),
@@ -81,6 +95,7 @@ def main():
         validation_data=val_ds,
         epochs=epochs,
         callbacks=callbacks,
+        class_weight=class_weight,
         verbose=1
     )
 
