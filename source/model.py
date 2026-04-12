@@ -11,7 +11,8 @@ Architecture:
                        Two specialised heads: copy-move and splicing
     Attention        : Dynamically weights RGB vs noise stream contribution
     Fusion           : Weighted combination of both streams
-    Classifier head  : Fully connected layers → 3-class softmax output
+    Classifier head  : Fully connected layers with L2 regularisation and
+                       increased dropout → 3-class softmax output
                        Classes: authentic | copy_move | splicing
 
 Functions:
@@ -24,7 +25,7 @@ Usage (from other modules):
 
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
+from tensorflow.keras import layers, regularizers
 from tensorflow.keras.applications import ResNet50
 
 from settings.SettingsAssistant import CONFIG
@@ -71,6 +72,10 @@ def build_model(train_backbone=False):
     num_classes = cfg["num_classes"]
     lr          = CONFIG["training"]["learning_rate"]
 
+    # L2 regularisation applied to all Dense layers in the classifier head
+    # Penalises large weights — reduces overfitting
+    l2 = regularizers.l2(0.001)
+
     inputs = keras.Input(shape=(img_size, img_size, 3), name="input")
 
     # Normalize pixel values [0-255] → [0.0-1.0] inside the model
@@ -103,13 +108,15 @@ def build_model(train_backbone=False):
     n = layers.Conv2D(128, 3, padding="same", activation="relu", name="noise_conv3")(n)
     n = layers.GlobalAveragePooling2D(name="noise_gap")(n)   # (batch, 128)
 
-    # Specialised copy-move head
-    cm = layers.Dense(128, activation="relu", name="cm_fc1")(n)
-    cm = layers.Dense(64,  activation="relu", name="cm_fc2")(cm)
+    # Specialised copy-move head — L2 regularisation added
+    cm = layers.Dense(128, activation="relu", kernel_regularizer=l2, name="cm_fc1")(n)
+    cm = layers.Dropout(0.3, name="cm_drop")(cm)
+    cm = layers.Dense(64,  activation="relu", kernel_regularizer=l2, name="cm_fc2")(cm)
 
-    # Specialised splicing head
-    sp = layers.Dense(128, activation="relu", name="sp_fc1")(n)
-    sp = layers.Dense(64,  activation="relu", name="sp_fc2")(sp)
+    # Specialised splicing head — L2 regularisation added
+    sp = layers.Dense(128, activation="relu", kernel_regularizer=l2, name="sp_fc1")(n)
+    sp = layers.Dropout(0.3, name="sp_drop")(sp)
+    sp = layers.Dense(64,  activation="relu", kernel_regularizer=l2, name="sp_fc2")(sp)
 
     noise_features = layers.Concatenate(name="noise_fusion")([cm, sp])  # (batch, 128)
 
@@ -136,8 +143,11 @@ def build_model(train_backbone=False):
     ])
 
     # ── Classifier Head ────────────────────────────────────────────
-    fused   = layers.Dense(128, activation="relu", name="fc1")(fused)
-    fused   = layers.Dropout(0.5, name="dropout")(fused)
+    # Stronger dropout (0.5) + L2 regularisation to combat overfitting
+    fused   = layers.Dense(128, activation="relu", kernel_regularizer=l2, name="fc1")(fused)
+    fused   = layers.Dropout(0.5, name="dropout1")(fused)
+    fused   = layers.Dense(64,  activation="relu", kernel_regularizer=l2, name="fc2")(fused)
+    fused   = layers.Dropout(0.4, name="dropout2")(fused)
     outputs = layers.Dense(num_classes, activation="softmax", name="output")(fused)
 
     # ── Compile ────────────────────────────────────────────────────
