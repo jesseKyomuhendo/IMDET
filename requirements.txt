@@ -3,3 +3,4 @@ scikit-learn
 numpy
 tensorflow
 Pillow
+matplotlib
