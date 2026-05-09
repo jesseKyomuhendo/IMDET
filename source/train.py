@@ -12,6 +12,10 @@ Steps:
     5. Evaluate final model on test set
     6. Save results and training plots to results/
 
+Imbalance strategy is controlled by config.yaml:
+    imbalance_strategy: class_weights  → class weights passed to model.fit
+    imbalance_strategy: oversampling   → balanced dataset, no class weights needed
+
 Usage:
     Press IDE run button or: python source/train.py
 """
@@ -40,8 +44,8 @@ def save_plots(history, results_dir: Path):
     Save training/validation loss and accuracy curves to results/.
     Useful for the report to show learning progress and detect overfitting.
     """
-    timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
-    epochs     = range(1, len(history.history["loss"]) + 1)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    epochs    = range(1, len(history.history["loss"]) + 1)
 
     # ── Loss plot ──────────────────────────────────────────────────
     plt.figure(figsize=(8, 4))
@@ -81,12 +85,9 @@ def save_confusion_matrix_plots(results, class_names, results_dir: Path, split_n
     import numpy as np
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # Rebuild y_true and y_pred from confusion matrix
     cm        = results["confusion_matrix"]
     n_classes = len(class_names)
 
-    # Convert multi-class CM to per-class binary CMs
     y_true_bin = []
     y_pred_bin = []
     for true_idx, row in enumerate(cm):
@@ -103,7 +104,7 @@ def save_confusion_matrix_plots(results, class_names, results_dir: Path, split_n
         plt.title(f"Confusion Matrix — {class_names[i]}")
         plt.colorbar()
 
-        tick_marks = np.arange(2)
+        tick_marks  = np.arange(2)
         axis_labels = ["Not class", "Class"]
         plt.xticks(tick_marks, axis_labels)
         plt.yticks(tick_marks, axis_labels)
@@ -129,6 +130,7 @@ def main():
     epochs      = CONFIG["training"]["epochs"]
     patience    = CONFIG["training"]["early_stopping_patience"]
     save_path   = CONFIG["model"]["save_path"]
+    strategy    = CONFIG["training"].get("imbalance_strategy", "class_weights")
     results_dir = Path(CONFIG["evaluation"]["results_dir"])
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -142,17 +144,21 @@ def main():
     print(f"  Total params: {model.count_params():,}\n")
 
     # ── Class Weights ─────────────────────────────────────────────
-    # Handles class imbalance: authentic=7491, copy_move=3295, splicing=1828
-    # Higher weight = model penalised more for getting that class wrong
-    class_weight = {
-        0: 1.0,            # authentic  — majority class, no boost
-        1: 7491 / 3295,    # copy_move  — ~2.3x weight
-        2: 7491 / 1828,    # splicing   — ~4.1x weight
-    }
-    print("Class weights:")
-    for cls, w in zip(class_names, class_weight.values()):
-        print(f"  {cls:<14} : {w:.4f}")
-    print()
+    # Only used when imbalance_strategy is class_weights.
+    # When oversampling, the dataset is already balanced — no weights needed.
+    if strategy == "class_weights":
+        class_weight = {
+            0: 1.0,            # authentic  — majority class, no boost
+            1: 7491 / 3295,    # copy_move  — ~2.3x weight
+            2: 7491 / 1828,    # splicing   — ~4.1x weight
+        }
+        print("Class weights:")
+        for cls, w in zip(class_names, class_weight.values()):
+            print(f"  {cls:<14} : {w:.4f}")
+        print()
+    else:
+        class_weight = None
+        print("Imbalance strategy: oversampling — no class weights applied\n")
 
     # ── Callbacks ─────────────────────────────────────────────────
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
@@ -186,10 +192,20 @@ def main():
     # ── Training ──────────────────────────────────────────────────
     print(f"Starting training — {epochs} epochs max, early stopping patience={patience}\n")
 
+    # When using oversampling the dataset repeats infinitely so we must set
+    # steps_per_epoch to tell Keras when one epoch ends
+    if strategy == "oversampling":
+        batch_size      = CONFIG["training"]["batch_size"]
+        total_train     = 8828  # Total training samples from split_dataset.py
+        steps_per_epoch = total_train // batch_size
+    else:
+        steps_per_epoch = None  # Keras infers automatically
+
     history = model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=epochs,
+        steps_per_epoch=steps_per_epoch,
         callbacks=callbacks,
         class_weight=class_weight,
         verbose=1

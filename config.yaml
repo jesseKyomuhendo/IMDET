@@ -37,6 +37,7 @@ training:
   batch_size: 32
   learning_rate: 0.00001
   early_stopping_patience: 15      # Stop if val loss does not improve for N epochs
+  imbalance_strategy: class_weights  # Options: class_weights | oversampling
 
 # Model
 model:

@@ -22,9 +22,15 @@ How it works:
     5. Returns three tf.data.Dataset objects (train, val, test)
        Images are loaded in batches as needed — not all at once into memory.
 
+Imbalance strategies:
+    class_weights : higher loss penalty for minority classes (used in model.fit)
+    oversampling  : samples equally from each class using tf.data.Dataset.sample_from_datasets
+                    so each class appears with equal frequency during training
+
 Functions:
-    build_dataset   : builds a tf.data.Dataset from a single CSV file
-    get_datasets    : returns train, val, and test datasets in one call
+    build_dataset           : builds a tf.data.Dataset from a single CSV file
+    build_oversampled_dataset : builds a class-balanced dataset using oversampling
+    get_datasets            : returns train, val, and test datasets in one call
 
 Usage (from other modules):
     from source.dataset import get_datasets
@@ -132,25 +138,92 @@ def build_dataset(csv_path: Path, augment: bool = False):
     return ds
 
 
+def build_oversampled_dataset(csv_path: Path):
+    """
+    Build a class-balanced training dataset using oversampling.
+    Samples equally from each class so minority classes (copy_move, splicing)
+    appear as frequently as the majority class (authentic) during training.
+
+    Each class is repeated infinitely and sampled with equal probability (1/3 each).
+    This directly addresses class imbalance at the data level rather than
+    through loss weighting.
+
+    Args:
+        csv_path : path to train.csv
+
+    Returns:
+        Batched tf.data.Dataset with balanced class distribution
+    """
+    batch_size = CONFIG["training"]["batch_size"]
+    seed       = CONFIG["split"]["seed"]
+
+    filepaths, labels = _read_csv(csv_path)
+
+    print(f"  Loaded {len(filepaths)} samples from {csv_path.name}")
+
+    # Split filepaths and labels by class
+    per_class_datasets = []
+    for class_idx in range(len(CLASS_NAMES)):
+        mask       = labels == class_idx
+        cls_paths  = filepaths[mask]
+        cls_labels = labels[mask]
+
+        print(f"  {CLASS_NAMES[class_idx]:<14} : {len(cls_paths)} samples")
+
+        cls_ds = tf.data.Dataset.from_tensor_slices((cls_paths, cls_labels))
+        cls_ds = cls_ds.shuffle(buffer_size=len(cls_paths), seed=seed)
+        cls_ds = cls_ds.repeat()  # Repeat infinitely so minority classes don't run out
+        cls_ds = cls_ds.map(_load_image, num_parallel_calls=tf.data.AUTOTUNE)
+        cls_ds = cls_ds.map(_augment,    num_parallel_calls=tf.data.AUTOTUNE)
+
+        per_class_datasets.append(cls_ds)
+
+    # Sample equally from each class — each class gets 1/3 of the batches
+    n_classes = len(CLASS_NAMES)
+    weights   = [1.0 / n_classes] * n_classes
+
+    balanced_ds = tf.data.Dataset.sample_from_datasets(
+        per_class_datasets,
+        weights=weights,
+        seed=seed
+    )
+
+    balanced_ds = balanced_ds.batch(batch_size)
+    balanced_ds = balanced_ds.prefetch(tf.data.AUTOTUNE)
+
+    return balanced_ds
+
+
 def get_datasets():
     """
     Build and return train, val, and test datasets.
     Called by train.py and test.py.
 
+    The training dataset strategy is controlled by config.yaml:
+        imbalance_strategy: class_weights  → standard dataset, class weights passed to model.fit
+        imbalance_strategy: oversampling   → balanced dataset via sample_from_datasets
+
     Returns:
-        train_ds    : shuffled + augmented training dataset
+        train_ds    : training dataset (standard or oversampled based on config)
         val_ds      : validation dataset (no augmentation)
         test_ds     : test dataset (no augmentation)
         class_names : list of class name strings ['authentic', 'copy_move', 'splicing']
     """
     split_dir = Path(CONFIG["data"]["split_dir"])
+    strategy  = CONFIG["training"].get("imbalance_strategy", "class_weights")
 
     print("\nBuilding datasets...")
-    train_ds = build_dataset(split_dir / "train.csv", augment=True)
-    val_ds   = build_dataset(split_dir / "val.csv",   augment=False)
-    test_ds  = build_dataset(split_dir / "test.csv",  augment=False)
+    print(f"  Imbalance strategy : {strategy}\n")
 
-    print(f"  Classes : {CLASS_NAMES}")
+    if strategy == "oversampling":
+        train_ds = build_oversampled_dataset(split_dir / "train.csv")
+    else:
+        train_ds = build_dataset(split_dir / "train.csv", augment=True)
+
+    val_ds  = build_dataset(split_dir / "val.csv",  augment=False)
+    test_ds = build_dataset(split_dir / "test.csv", augment=False)
+
+    print(f"\n  Classes : {CLASS_NAMES}")
     print(f"  Mapping : {CLASS_TO_IDX}\n")
 
     return train_ds, val_ds, test_ds, CLASS_NAMES
