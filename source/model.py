@@ -5,6 +5,8 @@ Defines the two-stream hybrid CNN architecture for image manipulation detection.
 
 Architecture:
     Stream 1 (RGB)   : ResNet50 backbone pretrained on ImageNet (frozen by default)
+                       Data augmentation applied to RGB stream only — noise stream
+                       receives clean unaugmented pixels to preserve forensic signals
                        Extracts semantic and visual features
     Stream 2 (Noise) : SRM (Spatial Rich Model) constrained conv layers
                        Extracts noise residuals and texture artefacts
@@ -46,12 +48,29 @@ def _srm_conv_layer(inp):
          [[-1.0], [-1.0], [-1.0]]],
         dtype=tf.float32
     )
-    kernel = tf.repeat(kernel, repeats=3, axis=2)   # (3, 3, 3)
-    kernel = tf.reshape(kernel, (3, 3, 3, 1))        # (3, 3, 3, 1)
+    kernel = tf.repeat(kernel, repeats=3, axis=2)
+    kernel = tf.reshape(kernel, (3, 3, 3, 1))
 
     inp = tf.cast(inp, tf.float32)
     inp = tf.nn.depthwise_conv2d(inp, filter=kernel, strides=[1, 1, 1, 1], padding="SAME")
     return inp
+
+
+# ── RGB Augmentation ───────────────────────────────────────────────────────────
+# Applied to RGB stream only — keeps noise stream clean so SRM can detect
+# manipulation artifacts without interference from augmentation transforms
+
+def _get_rgb_augmentation():
+    """
+    Returns a Keras Sequential augmentation pipeline for the RGB stream only.
+    Conservative augmentations that preserve image content while adding variety.
+    RandomTranslation added from teammate's code — shifts image slightly.
+    """
+    return keras.Sequential([
+        layers.RandomFlip("horizontal"),
+        layers.RandomRotation(0.1),
+        layers.RandomTranslation(0.05, 0.05),  # Added from teammate's code
+    ], name="rgb_augmentation")
 
 
 # ── Model Builder ──────────────────────────────────────────────────────────────
@@ -72,8 +91,7 @@ def build_model(train_backbone=False):
     num_classes = cfg["num_classes"]
     lr          = CONFIG["training"]["learning_rate"]
 
-    # L2 regularisation applied to all Dense layers in the classifier head
-    # Penalises large weights — reduces overfitting
+    # L2 regularisation — penalises large weights to reduce overfitting
     l2 = regularizers.l2(0.001)
 
     inputs = keras.Input(shape=(img_size, img_size, 3), name="input")
@@ -82,6 +100,11 @@ def build_model(train_backbone=False):
     rescaled = layers.Rescaling(1.0 / 255.0, name="rescaling")(inputs)
 
     # ── Stream 1: RGB ──────────────────────────────────────────────
+    # Augmentation applied to RGB stream only during training
+    # Noise stream uses the clean rescaled input — augmenting it would
+    # destroy the subtle pixel-level artifacts the SRM filter detects
+    rgb_augmented = _get_rgb_augmentation()(rescaled)
+
     backbone = ResNet50(
         include_top=False,
         weights="imagenet" if cfg["pretrained"] else None,
@@ -89,9 +112,10 @@ def build_model(train_backbone=False):
     )
     backbone.trainable = train_backbone
 
-    rgb_features = backbone(rescaled)   # Shape: (batch, 2048)
+    rgb_features = backbone(rgb_augmented)   # Shape: (batch, 2048)
 
     # ── Stream 2: Noise / SRM ──────────────────────────────────────
+    # Uses clean rescaled input — not augmented
     x_noise = layers.Lambda(
         _srm_conv_layer,
         output_shape=lambda s: s,
@@ -106,19 +130,19 @@ def build_model(train_backbone=False):
     n = layers.MaxPooling2D(name="noise_pool2")(n)
 
     n = layers.Conv2D(128, 3, padding="same", activation="relu", name="noise_conv3")(n)
-    n = layers.GlobalAveragePooling2D(name="noise_gap")(n)   # (batch, 128)
+    n = layers.GlobalAveragePooling2D(name="noise_gap")(n)
 
-    # Specialised copy-move head — L2 regularisation added
+    # Specialised copy-move head
     cm = layers.Dense(128, activation="relu", kernel_regularizer=l2, name="cm_fc1")(n)
     cm = layers.Dropout(0.3, name="cm_drop")(cm)
     cm = layers.Dense(64,  activation="relu", kernel_regularizer=l2, name="cm_fc2")(cm)
 
-    # Specialised splicing head — L2 regularisation added
+    # Specialised splicing head
     sp = layers.Dense(128, activation="relu", kernel_regularizer=l2, name="sp_fc1")(n)
     sp = layers.Dropout(0.3, name="sp_drop")(sp)
     sp = layers.Dense(64,  activation="relu", kernel_regularizer=l2, name="sp_fc2")(sp)
 
-    noise_features = layers.Concatenate(name="noise_fusion")([cm, sp])  # (batch, 128)
+    noise_features = layers.Concatenate(name="noise_fusion")([cm, sp])
 
     # ── Attention ──────────────────────────────────────────────────
     fused_input = layers.Concatenate(name="pre_attention")([rgb_features, noise_features])
@@ -143,7 +167,6 @@ def build_model(train_backbone=False):
     ])
 
     # ── Classifier Head ────────────────────────────────────────────
-    # Stronger dropout (0.5) + L2 regularisation to combat overfitting
     fused   = layers.Dense(128, activation="relu", kernel_regularizer=l2, name="fc1")(fused)
     fused   = layers.Dropout(0.5, name="dropout1")(fused)
     fused   = layers.Dense(64,  activation="relu", kernel_regularizer=l2, name="fc2")(fused)
