@@ -11,9 +11,7 @@ Functions:
     save_confusion_matrix   : saves seaborn heatmap confusion matrix
     save_roc_curve          : saves per-class ROC curve plot
 
-Usage (from other modules):
-    from source.evaluate import evaluate_model, print_results, save_results
-    from source.evaluate import save_confusion_matrix, save_roc_curve
+
 """
 
 import json
@@ -145,7 +143,7 @@ def save_results(results, split_name="test"):
 def save_confusion_matrix(results, class_names, results_dir: Path, split_name="test"):
     """
     Save a seaborn heatmap confusion matrix to results/.
-    Single matrix showing all classes — matches the style in the team's notebook.
+    Single matrix showing all classes, matches the style in the team's notebook.
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     cm        = np.array(results["confusion_matrix"])

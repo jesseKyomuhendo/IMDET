@@ -13,11 +13,10 @@ Steps:
     6. Save results and training plots to results/
 
 Imbalance strategy is controlled by config.yaml:
-    imbalance_strategy: class_weights  → class weights passed to model.fit
-    imbalance_strategy: oversampling   → balanced dataset, no class weights needed
+    imbalance_strategy: class_weights, class weights passed to model.fit
+    imbalance_strategy: oversampling, balanced dataset, no class weights needed
 
-Usage:
-    Press IDE run button or: python source/train.py
+The following command is used during training: python source/train.py
 """
 
 import os
@@ -49,7 +48,7 @@ def save_plots(history, results_dir: Path):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     epochs    = range(1, len(history.history["loss"]) + 1)
 
-    # ── Loss plot ──────────────────────────────────────────────────
+    # Loss plot
     plt.figure(figsize=(8, 4))
     plt.plot(epochs, history.history["loss"],     "b-", label="Training Loss")
     plt.plot(epochs, history.history["val_loss"], "r-", label="Validation Loss")
@@ -63,7 +62,7 @@ def save_plots(history, results_dir: Path):
     plt.close()
     print(f"  Loss curve saved to: {loss_path}")
 
-    # ── Accuracy plot ──────────────────────────────────────────────
+    #  Accuracy plot
     plt.figure(figsize=(8, 4))
     plt.plot(epochs, history.history["accuracy"],     "b-", label="Training Accuracy")
     plt.plot(epochs, history.history["val_accuracy"], "r-", label="Validation Accuracy")
@@ -79,7 +78,7 @@ def save_plots(history, results_dir: Path):
 
 
 def main():
-    # ── Config ────────────────────────────────────────────────────
+    #  Config
     epochs      = CONFIG["training"]["epochs"]
     patience    = CONFIG["training"]["early_stopping_patience"]
     save_path   = CONFIG["model"]["save_path"]
@@ -87,16 +86,16 @@ def main():
     results_dir = Path(CONFIG["evaluation"]["results_dir"])
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Datasets ──────────────────────────────────────────────────
+    #  Datasets
     train_ds, val_ds, test_ds, class_names = get_datasets()
 
-    # ── Model ─────────────────────────────────────────────────────
+    #  Model
     print("Building model...")
     model = build_model(train_backbone=True)
     print(f"  Model: {model.name}")
     print(f"  Total params: {model.count_params():,}\n")
 
-    # ── Class Weights ─────────────────────────────────────────────
+    # Class Weights
     if strategy == "class_weights":
         class_weight = {
             0: 1.0,
@@ -111,7 +110,7 @@ def main():
         class_weight = None
         print("Imbalance strategy: oversampling — no class weights applied\n")
 
-    # ── Callbacks ─────────────────────────────────────────────────
+    #  Callbacks
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     callbacks = [
@@ -137,7 +136,7 @@ def main():
         ),
     ]
 
-    # ── Training ──────────────────────────────────────────────────
+    # Training
     print(f"Starting training — {epochs} epochs max, early stopping patience={patience}\n")
 
     if strategy == "oversampling":
@@ -157,11 +156,11 @@ def main():
         verbose=1
     )
 
-    # ── Save training plots ───────────────────────────────────────
+    # Save training plots
     print("\nSaving training plots...")
     save_plots(history, results_dir)
 
-    # ── Evaluation on test set ────────────────────────────────────
+    #  Evaluation on test set
     print("\nEvaluating on test set...")
     test_results = evaluate_model(model, test_ds, class_names)
     print_results(test_results, split_name="Test")
@@ -169,7 +168,7 @@ def main():
     save_confusion_matrix(test_results, class_names, results_dir, split_name="test")
     save_roc_curve(test_results, class_names, results_dir, split_name="test")
 
-    # ── Evaluation on val set ─────────────────────────────────────
+    # Evaluation on val set
     print("Evaluating on validation set...")
     val_results = evaluate_model(model, val_ds, class_names)
     print_results(val_results, split_name="Validation")

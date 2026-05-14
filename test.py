@@ -3,7 +3,7 @@ test.py
 -------
 Loads the trained IMD model and evaluates it on the test set.
 
-Requirements:
+It requires the following:
     - Trained model must exist at path defined in config.yaml (model.save_path)
     - Test split CSV must exist at data/splits/test.csv
     - Dataset must be placed as defined in config.yaml (data.casia_dir)
@@ -29,13 +29,13 @@ from settings.SettingsAssistant import CONFIG
 def main():
     save_path = CONFIG["model"]["save_path"]
 
-    # ── Check model exists ────────────────────────────────────────
+    # Check model exists
     if not Path(save_path).exists():
         print(f"\nError: No trained model found at '{save_path}'")
         print("Please train the model first by running: python source/train.py")
         return
 
-    # ── Load model ────────────────────────────────────────────────
+    #  Load model
     print(f"\nLoading model from: {save_path}")
     keras.config.enable_unsafe_deserialization()
     model = keras.models.load_model(
@@ -45,10 +45,10 @@ def main():
     print(f"  Model loaded successfully: {model.name}")
     print(f"  Total params: {model.count_params():,}\n")
 
-    # ── Load test dataset ─────────────────────────────────────────
+    #  Load test dataset
     _, _, test_ds, class_names = get_datasets()
 
-    # ── Evaluate ──────────────────────────────────────────────────
+    # Evaluate
     print("Running evaluation on test set...")
     results = evaluate_model(model, test_ds, class_names)
 

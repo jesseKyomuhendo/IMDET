@@ -14,7 +14,7 @@ How it works:
            - Reads the file from disk
            - Decodes it (supports JPG, PNG, BMP)
            - Resizes to 224x224
-           - Returns raw pixel values [0-255] — model handles normalization
+           - Returns raw pixel values [0-255]. model handles normalization
     4. For training set only, applies random augmentation:
            - Random horizontal flip
            - Random vertical flip
@@ -32,9 +32,7 @@ Functions:
     build_oversampled_dataset : builds a class-balanced dataset using oversampling
     get_datasets            : returns train, val, and test datasets in one call
 
-Usage (from other modules):
-    from source.dataset import get_datasets
-    train_ds, val_ds, test_ds, class_names = get_datasets()
+
 """
 
 import csv
@@ -46,7 +44,7 @@ import tensorflow as tf
 from settings.SettingsAssistant import CONFIG
 
 
-# ── Label mapping ──────────────────────────────────────────────────
+#  Label mapping
 # Map class name string → integer index (order matches config.yaml classes list)
 CLASS_NAMES = CONFIG["classes"]
 CLASS_TO_IDX = {cls: i for i, cls in enumerate(CLASS_NAMES)}
@@ -106,7 +104,7 @@ def _read_csv(csv_path: Path):
 def build_dataset(csv_path: Path, augment: bool = False):
     """
     Build a tf.data.Dataset from a CSV split file.
-    Images are loaded from disk in batches — not all at once into memory.
+    Images are loaded from disk in batches, not all at once into memory.
 
     Args:
         csv_path : path to the CSV file (train.csv / val.csv / test.csv)
@@ -200,8 +198,8 @@ def get_datasets():
     Called by train.py and test.py.
 
     The training dataset strategy is controlled by config.yaml:
-        imbalance_strategy: class_weights  → standard dataset, class weights passed to model.fit
-        imbalance_strategy: oversampling   → balanced dataset via sample_from_datasets
+        imbalance_strategy: class_weights  -- (standard dataset, class weights passed to model.fit)
+        imbalance_strategy: oversampling    (balanced dataset via sample_from_datasets)
 
     Returns:
         train_ds    : training dataset (standard or oversampled based on config)

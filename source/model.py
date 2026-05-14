@@ -5,7 +5,7 @@ Defines the two-stream hybrid CNN architecture for image manipulation detection.
 
 Architecture:
     Stream 1 (RGB)   : ResNet50 backbone pretrained on ImageNet (frozen by default)
-                       Data augmentation applied to RGB stream only — noise stream
+                       Data augmentation applied to RGB stream only, noise stream
                        receives clean unaugmented pixels to preserve forensic signals
                        Extracts semantic and visual features
     Stream 2 (Noise) : SRM (Spatial Rich Model) constrained conv layers
@@ -14,15 +14,13 @@ Architecture:
     Attention        : Dynamically weights RGB vs noise stream contribution
     Fusion           : Weighted combination of both streams
     Classifier head  : Fully connected layers with L2 regularisation and
-                       increased dropout → 3-class softmax output
+                       increased dropout, 3-class softmax output
                        Classes: authentic | copy_move | splicing
 
 Functions:
     build_model : builds and returns the full two-stream Keras model
 
-Usage (from other modules):
-    from source.model import build_model
-    model = build_model()
+
 """
 
 import tensorflow as tf
@@ -33,7 +31,7 @@ from tensorflow.keras.applications import ResNet50
 from settings.SettingsAssistant import CONFIG
 
 
-# ── SRM Filter ─────────────────────────────────────────────────────────────────
+# SRM Filter
 
 @tf.keras.utils.register_keras_serializable()
 def _srm_conv_layer(inp):
@@ -56,7 +54,7 @@ def _srm_conv_layer(inp):
     return inp
 
 
-# ── RGB Augmentation ───────────────────────────────────────────────────────────
+# RGB Augmentation
 # Applied to RGB stream only — keeps noise stream clean so SRM can detect
 # manipulation artifacts without interference from augmentation transforms
 
@@ -73,7 +71,7 @@ def _get_rgb_augmentation():
     ], name="rgb_augmentation")
 
 
-# ── Model Builder ──────────────────────────────────────────────────────────────
+#  Model Builder
 
 def build_model(train_backbone=False):
     """
@@ -81,7 +79,7 @@ def build_model(train_backbone=False):
 
     Args:
         train_backbone : whether to unfreeze ResNet50 weights for fine-tuning.
-                         Default False — backbone frozen, only head trains.
+                         Default False: backbone frozen, only head trains.
 
     Returns:
         Compiled Keras model ready for training.
@@ -91,17 +89,17 @@ def build_model(train_backbone=False):
     num_classes = cfg["num_classes"]
     lr          = CONFIG["training"]["learning_rate"]
 
-    # L2 regularisation — penalises large weights to reduce overfitting
+    # L2 regularisation: penalises large weights to reduce overfitting
     l2 = regularizers.l2(0.001)
 
     inputs = keras.Input(shape=(img_size, img_size, 3), name="input")
 
-    # Normalize pixel values [0-255] → [0.0-1.0] inside the model
+    # Normalize pixel values [0-255] -- [0.0-1.0] inside the model
     rescaled = layers.Rescaling(1.0 / 255.0, name="rescaling")(inputs)
 
-    # ── Stream 1: RGB ──────────────────────────────────────────────
+    #  Stream 1: RGB
     # Augmentation applied to RGB stream only during training
-    # Noise stream uses the clean rescaled input — augmenting it would
+    # Noise stream uses the clean rescaled input: augmenting it would
     # destroy the subtle pixel-level artifacts the SRM filter detects
     rgb_augmented = _get_rgb_augmentation()(rescaled)
 
@@ -114,8 +112,8 @@ def build_model(train_backbone=False):
 
     rgb_features = backbone(rgb_augmented)   # Shape: (batch, 2048)
 
-    # ── Stream 2: Noise / SRM ──────────────────────────────────────
-    # Uses clean rescaled input — not augmented
+    # Stream 2: Noise / SRM
+    # Uses clean rescaled input, not augmented
     x_noise = layers.Lambda(
         _srm_conv_layer,
         output_shape=lambda s: s,
@@ -144,7 +142,7 @@ def build_model(train_backbone=False):
 
     noise_features = layers.Concatenate(name="noise_fusion")([cm, sp])
 
-    # ── Attention ──────────────────────────────────────────────────
+    #  Attention
     fused_input = layers.Concatenate(name="pre_attention")([rgb_features, noise_features])
 
     att       = layers.Dense(2, activation="softmax", name="attention")(fused_input)
@@ -160,20 +158,20 @@ def build_model(train_backbone=False):
     rgb_weighted   = layers.Multiply(name="rgb_weighted")([rgb_exp,   att_rgb_exp])
     noise_weighted = layers.Multiply(name="noise_weighted")([noise_exp, att_noise_exp])
 
-    # ── Fusion ─────────────────────────────────────────────────────
+    # Fusion
     fused = layers.Concatenate(axis=-1, name="fusion")([
         layers.Flatten(name="rgb_flat")(rgb_weighted),
         layers.Flatten(name="noise_flat")(noise_weighted),
     ])
 
-    # ── Classifier Head ────────────────────────────────────────────
+    # Classifier Head
     fused   = layers.Dense(128, activation="relu", kernel_regularizer=l2, name="fc1")(fused)
     fused   = layers.Dropout(0.5, name="dropout1")(fused)
     fused   = layers.Dense(64,  activation="relu", kernel_regularizer=l2, name="fc2")(fused)
     fused   = layers.Dropout(0.4, name="dropout2")(fused)
     outputs = layers.Dense(num_classes, activation="softmax", name="output")(fused)
 
-    # ── Compile ────────────────────────────────────────────────────
+    # Compile
     m = keras.Model(inputs=inputs, outputs=outputs, name="IMD_TwoStream")
     m.compile(
         optimizer=keras.optimizers.Adam(learning_rate=lr),

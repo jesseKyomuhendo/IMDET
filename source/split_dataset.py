@@ -13,8 +13,7 @@ Output:
     data/splits/val.csv
     data/splits/test.csv
 
-Usage:
-    Press IDE run button or run the following CLI command: python source/split_dataset.py
+The file is run as module: python source/split_dataset.py
 """
 
 # Imports
