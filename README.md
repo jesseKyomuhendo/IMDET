@@ -9,11 +9,8 @@ Detects two types: **copy-move** and **splicing**, plus authentic images.
 
 ```
 IMDET/
-├── data/
-│   ├── CASIA2.0/          ← Primary training dataset (download separately)
-│   ├── Columbia/          ← Cross-dataset evaluation (download separately)
-│   └── splits/            ← Auto-generated CSV splits (train/val/test)
-├── model/                 ← Trained model saved here after training
+├── data/                  ← Dataset folder (not included in repo, download separately)
+├── model/                 ← Trained model (included in submission ZIP)
 ├── results/               ← Evaluation results saved here (JSON)
 ├── settings/
 │   └── SettingsAssistant.py
@@ -34,6 +31,7 @@ IMDET/
 ## Setup
 
 > **Windows users:** TensorFlow requires Python 3.11 or lower.
+
 ### 1. Create a Virtual Environment
 
 **Windows:**
@@ -56,41 +54,72 @@ pip install -r requirements.txt
 
 ---
 
-## Dataset Setup
+## Dataset
 
-Datasets are not included in the repository due to size. Download and place them manually.
+The dataset is not included in the repository due to size.
 
-### CASIA 2.0 (Primary — ~2.6 GB)
+### CASIA2.0 ZIP
+Download from: [CASIA2.0 DOWNLOAD LINK — TO BE PROVIDED]
 
-
-### Columbia Uncompressed (Cross-dataset evaluation — ~400 MB)
+The ZIP contains:
+- Organised image folders (authentic, copy_move, splicing)
+- Dataset splits (train.csv, val.csv, test.csv)
 
 ---
 
-## Running the Project
+## Reproducing Results on Google Colab
 
-### Step 1 — Generate dataset splits
+> **Note:** Running test.py on native Windows may crash due to a known
+> TensorFlow limitation with large models on Windows >= 2.11.
+> We recommend using Google Colab to reproduce results.
+
+### Step 1 — Open a new notebook
+Go to https://colab.research.google.com and open a new notebook.
+Open the Terminal from the left sidebar (the `>_` icon).
+
+### Step 2 — Upload the submission ZIP
+Upload `Project-Group05.zip` via the Files panel (upload button in the left sidebar).
+Wait for the upload to complete before proceeding.
+
+### Step 3 — Unzip the submission
 ```bash
-python source/split_dataset.py
+unzip /content/Project-Group05.zip -d /content/IMDET
+cd /content/IMDET
 ```
-Creates `data/splits/train.csv`, `val.csv`, `test.csv`.
 
-### Step 2 — Train the model
+### Step 4 — Upload and unzip the dataset
+Upload `CASIA2.0.zip` via the Files panel, then extract:
 ```bash
-python source/train.py
+unzip /content/CASIA2.0.zip -d /content/IMDET/data
 ```
-Trains the model and saves the best version to `model/best_model.keras`.
 
-> **Note:** Training on CPU is very slow (~30-60 min/epoch).
-> We use Google Colab 
+### Step 5 — Install dependencies
+```bash
+pip install -r requirements.txt
+```
 
-### Step 3 — Evaluate (reproduce results)
+### Step 6 — Run test
 ```bash
 python test.py
 ```
-Loads the trained model and runs evaluation on the test set.
-Prints accuracy, F1, AUC-ROC, and confusion matrix.
-Saves results to `results/`.
+
+Results will be printed to the terminal and saved to `results/`.
+
+---
+
+## Training
+
+Training was conducted on Google Colab Pro using an NVIDIA A100 GPU.
+To retrain the model from scratch:
+
+```bash
+python source/train.py
+```
+
+> **Note:** Training on CPU is very slow (~30-60 min/epoch).
+> We recommend Google Colab for training.
+
+The imbalance strategy and all other hyperparameters can be configured in `config.yaml`.
 
 ---
 
@@ -98,6 +127,31 @@ Saves results to `results/`.
 
 All parameters are defined in `config.yaml`. No hardcoded values exist in any source file.
 
+Key settings:
+```yaml
+training:
+  epochs: 100
+  batch_size: 32
+  learning_rate: 0.00001
+  early_stopping_patience: 45
+  imbalance_strategy: class_weights
 
+model:
+  backbone: resnet50
+  pretrained: true
+  num_classes: 3
+```
 
 ---
+
+## AI Tools
+
+This project used Claude (Anthropic) as a development assistant for code scaffolding and debugging.
+All code was reviewed, tested, and adapted by the group members.
+
+---
+
+## Group 5
+- Sambrina Selvarajah
+- Sandra Østrem
+- Jesse Kyomuhendo Tibamwenda
