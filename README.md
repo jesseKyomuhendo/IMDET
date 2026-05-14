@@ -29,7 +29,7 @@ IMDET/
 
 ---
 
-## Setup
+## Setup (Not needed if you are testing on Google Colab)
 
 > **Windows users:** TensorFlow requires Python 3.11 or lower.
 
