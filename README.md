@@ -62,6 +62,8 @@ The dataset is not included in the repository due to size.
 ### Datasets and Splits
 Download from: https://drive.google.com/drive/folders/1xT-BTCMnHEe1R45objlO6cIzZlpsdOrE?usp=sharing
 
+- The download zip file should be renamed to:`Data.zip`
+
 The ZIP contains:
 - CASIA2.0 image folders (authentic, copy_move, splicing)
 - Dataset splits (train.csv, val.csv, test.csv)
@@ -82,16 +84,16 @@ Open the Terminal from the left sidebar (the `>_` icon).
 Upload `Project-Group05.zip` via the Files panel (upload button in the left sidebar).
 Wait for the upload to complete before proceeding.
 
-### Step 3 — Unzip the submission
+### Step 3 — Unzip the source code 
 ```bash
 unzip /content/Project-Group05.zip -d /content/
 cd /content/IMDET
 ```
 
 ### Step 4 — Upload and unzip the dataset
-Upload `CASIA2.0.zip` via the Files panel, then extract:
+Upload `Data.zip` via the Files panel, then extract:
 ```bash
-unzip /content/CASIA2.0.zip -d /content/IMDET/data
+unzip /content/Data.zip -d /content/IMDET/data
 ```
 
 ### Step 5 — Install dependencies
