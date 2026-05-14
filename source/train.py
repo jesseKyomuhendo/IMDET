@@ -25,7 +25,7 @@ from pathlib import Path
 from datetime import datetime
 
 import matplotlib
-matplotlib.use("Agg")  # Non-interactive backend — works on Colab and headless servers
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
@@ -35,14 +35,16 @@ os.chdir(Path(__file__).resolve().parent.parent)
 
 from source.dataset  import get_datasets
 from source.model    import build_model
-from source.evaluate import evaluate_model, print_results, save_results
+from source.evaluate import (
+    evaluate_model, print_results, save_results,
+    save_confusion_matrix, save_roc_curve
+)
 from settings.SettingsAssistant import CONFIG
 
 
 def save_plots(history, results_dir: Path):
     """
     Save training/validation loss and accuracy curves to results/.
-    Useful for the report to show learning progress and detect overfitting.
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     epochs    = range(1, len(history.history["loss"]) + 1)
@@ -57,7 +59,7 @@ def save_plots(history, results_dir: Path):
     plt.legend()
     plt.tight_layout()
     loss_path = results_dir / f"loss_curve_{timestamp}.png"
-    plt.savefig(loss_path)
+    plt.savefig(loss_path, dpi=150)
     plt.close()
     print(f"  Loss curve saved to: {loss_path}")
 
@@ -71,58 +73,9 @@ def save_plots(history, results_dir: Path):
     plt.legend()
     plt.tight_layout()
     acc_path = results_dir / f"accuracy_curve_{timestamp}.png"
-    plt.savefig(acc_path)
+    plt.savefig(acc_path, dpi=150)
     plt.close()
     print(f"  Accuracy curve saved to: {acc_path}")
-
-
-def save_confusion_matrix_plots(results, class_names, results_dir: Path, split_name="test"):
-    """
-    Save per-class confusion matrix visualisations to results/.
-    Shows TP, FP, TN, FN for each class individually.
-    """
-    from sklearn.metrics import multilabel_confusion_matrix
-    import numpy as np
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    cm        = results["confusion_matrix"]
-    n_classes = len(class_names)
-
-    y_true_bin = []
-    y_pred_bin = []
-    for true_idx, row in enumerate(cm):
-        for pred_idx, count in enumerate(row):
-            y_true_bin.extend([true_idx] * count)
-            y_pred_bin.extend([pred_idx] * count)
-
-    mcm = multilabel_confusion_matrix(y_true_bin, y_pred_bin,
-                                      labels=list(range(n_classes)))
-
-    for i, binary_cm in enumerate(mcm):
-        plt.figure(figsize=(5, 4))
-        plt.imshow(binary_cm, interpolation="nearest", cmap="Blues")
-        plt.title(f"Confusion Matrix — {class_names[i]}")
-        plt.colorbar()
-
-        tick_marks  = np.arange(2)
-        axis_labels = ["Not class", "Class"]
-        plt.xticks(tick_marks, axis_labels)
-        plt.yticks(tick_marks, axis_labels)
-
-        label_matrix = [["TN", "FP"], ["FN", "TP"]]
-        for x in range(2):
-            for y in range(2):
-                plt.text(y, x, f"{label_matrix[x][y]}\n{binary_cm[x, y]}",
-                         ha="center", va="center", fontsize=12)
-
-        plt.ylabel("True Label")
-        plt.xlabel("Predicted Label")
-        plt.tight_layout()
-
-        plot_path = results_dir / f"{split_name}_cm_{class_names[i]}_{timestamp}.png"
-        plt.savefig(plot_path)
-        plt.close()
-        print(f"  Confusion matrix ({class_names[i]}) saved to: {plot_path}")
 
 
 def main():
@@ -144,13 +97,11 @@ def main():
     print(f"  Total params: {model.count_params():,}\n")
 
     # ── Class Weights ─────────────────────────────────────────────
-    # Only used when imbalance_strategy is class_weights.
-    # When oversampling, the dataset is already balanced — no weights needed.
     if strategy == "class_weights":
         class_weight = {
-            0: 1.0,            # authentic  — majority class, no boost
-            1: 7491 / 3295,    # copy_move  — ~2.3x weight
-            2: 7491 / 1828,    # splicing   — ~4.1x weight
+            0: 1.0,
+            1: 7491 / 3295,
+            2: 7491 / 1828,
         }
         print("Class weights:")
         for cls, w in zip(class_names, class_weight.values()):
@@ -164,7 +115,6 @@ def main():
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     callbacks = [
-        # Save best model based on val_loss
         keras.callbacks.ModelCheckpoint(
             filepath=save_path,
             monitor="val_loss",
@@ -172,14 +122,12 @@ def main():
             mode="min",
             verbose=1
         ),
-        # Stop training if val_loss does not improve for N epochs
         keras.callbacks.EarlyStopping(
             monitor="val_loss",
             patience=patience,
             restore_best_weights=True,
             verbose=1
         ),
-        # Reduce learning rate when val_loss plateaus
         keras.callbacks.ReduceLROnPlateau(
             monitor="val_loss",
             factor=0.5,
@@ -192,14 +140,12 @@ def main():
     # ── Training ──────────────────────────────────────────────────
     print(f"Starting training — {epochs} epochs max, early stopping patience={patience}\n")
 
-    # When using oversampling the dataset repeats infinitely so we must set
-    # steps_per_epoch to tell Keras when one epoch ends
     if strategy == "oversampling":
         batch_size      = CONFIG["training"]["batch_size"]
-        total_train     = 8828  # Total training samples from split_dataset.py
+        total_train     = 8828
         steps_per_epoch = total_train // batch_size
     else:
-        steps_per_epoch = None  # Keras infers automatically
+        steps_per_epoch = None
 
     history = model.fit(
         train_ds,
@@ -220,14 +166,16 @@ def main():
     test_results = evaluate_model(model, test_ds, class_names)
     print_results(test_results, split_name="Test")
     save_results(test_results, split_name="test")
-    save_confusion_matrix_plots(test_results, class_names, results_dir, split_name="test")
+    save_confusion_matrix(test_results, class_names, results_dir, split_name="test")
+    save_roc_curve(test_results, class_names, results_dir, split_name="test")
 
     # ── Evaluation on val set ─────────────────────────────────────
     print("Evaluating on validation set...")
     val_results = evaluate_model(model, val_ds, class_names)
     print_results(val_results, split_name="Validation")
     save_results(val_results, split_name="val")
-    save_confusion_matrix_plots(val_results, class_names, results_dir, split_name="val")
+    save_confusion_matrix(val_results, class_names, results_dir, split_name="val")
+    save_roc_curve(val_results, class_names, results_dir, split_name="val")
 
     print(f"\nTraining complete. Best model saved to: {save_path}")
 
