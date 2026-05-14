@@ -97,12 +97,17 @@ Upload `Data.zip` via the Files panel, then extract:
 unzip /content/Data.zip -d /content/IMDET/data
 ```
 
-### Step 5 — Install dependencies
+### Step 5 — Place `CASIA2.0` & `splits` folders into `data` folder of the repository
+- After unzipping the `Data.zip` file you will get a folder called `Data`
+- Inside `Data` are 2 folder called `CASIA2.0` & `splits`
+- Move `CASIA2.0` & `splits` into `data` folder of the repository/source code 
+
+### Step 6 — Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 6 — Run test
+### Step 7 — Run test
 ```bash
 python test.py
 ```
