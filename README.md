@@ -142,12 +142,6 @@ model:
   num_classes: 3
 ```
 
----
-
-## AI Tools
-
-This project used Claude (Anthropic) as a development assistant for code scaffolding and debugging.
-All code was reviewed, tested, and adapted by the group members.
 
 ---
 
