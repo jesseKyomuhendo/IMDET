@@ -1,21 +1,14 @@
-# : separates key and value
-# Indentation (2 spaces, not tabs) creates nesting
-# No quotes needed for simple values
-# "#" for comments
-
 # This block is meant for debugging .yaml file (Not used in the project)
 debug-yaml:
   message: "Image manipulation detection"
   number: 1000
 
-# ─────────────────────────────────────────
 # Project configuration
-# ─────────────────────────────────────────
 
 # Dataset paths (relative to project root)
 data:
   casia_dir: data/CASIA2.0         # Contains copy_move/, splicing/, authentic/
-  columbia_dir: data/Columbia      # Contains 4cam_auth/, 4cam_splc/
+  columbia_dir: data/Columbia      # Contains 4cam_auth/, 4cam_splc/ Not used in the project
   split_dir: data/splits           # Output folder for train/val/test CSV files
 
 # Dataset split ratios (must sum to 1.0)
@@ -37,11 +30,11 @@ training:
   batch_size: 32
   learning_rate: 0.00001
   early_stopping_patience: 20      # Stop if val loss does not improve for N epochs
-  imbalance_strategy: class_weights  # Options: class_weights | oversampling
+  imbalance_strategy: class_weights  # Options: class_weights or oversampling
 
 # Model
 model:
-  backbone: resnet50               # Options: resnet50, vgg16
+  backbone: resnet50               # resnet50
   pretrained: true                 # Use ImageNet pretrained weights
   num_classes: 3
   save_path: model/best_model.keras  # Where to save the trained model
