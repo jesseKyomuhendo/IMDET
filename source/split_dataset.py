@@ -5,7 +5,7 @@ Splits CASIA 2.0 into train / val / test sets and saves the file paths
 as CSV files in the splits directory defined in config.yaml.
 
 Does NOT copy or move any images. The CSV files contain:
-    filepath  : relative path to the image
+    filepath  : relative path to the image (always forward slashes)
     label     : class name (authentic, copy_move, splicing)
 
 Output:
@@ -26,10 +26,13 @@ from settings.SettingsAssistant import CONFIG
 
 
 def get_images(class_dir: Path, label: str):
-    """Return list of (filepath, label) for all images in a class folder."""
+    """Return list of (filepath, label) for all images in a class folder.
+    Uses forward slashes in paths regardless of OS to ensure compatibility
+    with Linux (Colab) and Windows.
+    """
     extensions = {".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".png"}
     return [
-        (str(f), label)
+        (str(f.as_posix()), label)
         for f in sorted(class_dir.iterdir())
         if f.is_file() and f.suffix.lower() in extensions
     ]

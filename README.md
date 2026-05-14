@@ -83,7 +83,7 @@ Wait for the upload to complete before proceeding.
 
 ### Step 3 — Unzip the submission
 ```bash
-unzip /content/Project-Group05.zip -d /content/IMDET
+unzip /content/Project-Group05.zip -d /content/
 cd /content/IMDET
 ```
 
