@@ -77,7 +77,7 @@ The ZIP contains:
 > TensorFlow limitation with large models on Windows >= 2.11.
 > We recommend using Google Colab to test the model.
 
-### Step 1 — Open a new notebook
+### Step 1 — Open a new notebook & make sure you are connected to A100 GPU
 Go to Google Colab and open a new notebook.
 Open the Terminal from the left sidebar (the `>_` icon).
 
