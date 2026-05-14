@@ -81,13 +81,13 @@ The ZIP contains:
 Go to Google Colab and open a new notebook.
 Open the Terminal from the left sidebar (the `>_` icon).
 
-### Step 2: Upload the submission ZIP
-Upload `Project-Group05.zip` via the Files panel (upload button in the left sidebar).
+### Step 2: Upload the source code submission ZIP
+Upload `Source_Code.zip` via the Files panel (upload button in the left sidebar).
 Wait for the upload to complete before proceeding.
 
 ### Step 3: Unzip the source code 
 ```bash
-unzip /content/Project-Group05.zip -d /content/
+unzip /content/Source_Code.zip -d /content/
 cd /content/IMDET
 ```
 
