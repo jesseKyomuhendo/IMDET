@@ -101,6 +101,7 @@ unzip /content/Data.zip -d /content/
 - After unzipping the `Data.zip` file you will get a folder called `Data`
 - Inside `Data` are 2 folder called `CASIA2.0` & `splits`
 - Move `CASIA2.0` & `splits` into `data` folder of the repository/source code 
+- You move folder by simply drag-and-drop via `Files` tab of Colab
 
 ### Step 6 — Install dependencies
 ```bash
