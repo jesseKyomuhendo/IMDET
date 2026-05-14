@@ -67,11 +67,11 @@ The ZIP contains:
 
 ---
 
-## Reproducing Results on Google Colab
+## Testing the Model on Google Colab
 
 > **Note:** Running test.py on native Windows may crash due to a known
 > TensorFlow limitation with large models on Windows >= 2.11.
-> We recommend using Google Colab to reproduce results.
+> We recommend using Google Colab to test the model.
 
 ### Step 1 — Open a new notebook
 Go to https://colab.research.google.com and open a new notebook.
