@@ -62,6 +62,7 @@ The dataset is not included in the repository due to size.
 ### Datasets and Splits
 Download from: https://drive.google.com/drive/folders/1xT-BTCMnHEe1R45objlO6cIzZlpsdOrE?usp=sharing
 
+- To download click the `Download all`  button in top right corner. (This will let you download the folder as one zip file)
 - The download zip file should be renamed to:`Data.zip`
 
 The ZIP contains:
