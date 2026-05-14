@@ -94,7 +94,7 @@ cd /content/IMDET
 ### Step 4 — Upload and unzip the dataset
 Upload `Data.zip` via the Files panel, then extract:
 ```bash
-unzip /content/Data.zip -d /content/IMDET/data
+unzip /content/Data.zip -d /content/
 ```
 
 ### Step 5 — Place `CASIA2.0` & `splits` folders into `data` folder of the repository
