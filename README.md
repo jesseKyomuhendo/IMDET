@@ -1,4 +1,5 @@
 # IMDET - Image Manipulation Detection
+### Repository GitHUB Link: https://github.com/jesseKyomuhendo/IMDET
 
 A two-stream hybrid CNN for detecting and classifying image manipulations.
 Detects two types: **copy-move** and **splicing**, plus authentic images.
@@ -58,11 +59,11 @@ pip install -r requirements.txt
 
 The dataset is not included in the repository due to size.
 
-### CASIA2.0 ZIP
-Download from: [CASIA2.0 DOWNLOAD LINK — TO BE PROVIDED]
+### Datasets and Splits
+Download from: https://drive.google.com/drive/folders/1xT-BTCMnHEe1R45objlO6cIzZlpsdOrE?usp=sharing
 
 The ZIP contains:
-- Organised image folders (authentic, copy_move, splicing)
+- CASIA2.0 image folders (authentic, copy_move, splicing)
 - Dataset splits (train.csv, val.csv, test.csv)
 
 ---
@@ -74,7 +75,7 @@ The ZIP contains:
 > We recommend using Google Colab to test the model.
 
 ### Step 1 — Open a new notebook
-Go to https://colab.research.google.com and open a new notebook.
+Go to Google Colab and open a new notebook.
 Open the Terminal from the left sidebar (the `>_` icon).
 
 ### Step 2 — Upload the submission ZIP
