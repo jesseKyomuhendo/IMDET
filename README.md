@@ -77,38 +77,38 @@ The ZIP contains:
 > TensorFlow limitation with large models on Windows >= 2.11.
 > We recommend using Google Colab to test the model.
 
-### Step 1 — Open a new notebook & make sure you are connected to A100 GPU
+### Step 1: Open a new notebook & make sure you are connected to A100 GPU
 Go to Google Colab and open a new notebook.
 Open the Terminal from the left sidebar (the `>_` icon).
 
-### Step 2 — Upload the submission ZIP
+### Step 2: Upload the submission ZIP
 Upload `Project-Group05.zip` via the Files panel (upload button in the left sidebar).
 Wait for the upload to complete before proceeding.
 
-### Step 3 — Unzip the source code 
+### Step 3: Unzip the source code 
 ```bash
 unzip /content/Project-Group05.zip -d /content/
 cd /content/IMDET
 ```
 
-### Step 4 — Upload and unzip the dataset
+### Step 4: Upload and unzip the dataset
 Upload `Data.zip` via the Files panel, then extract:
 ```bash
 unzip /content/Data.zip -d /content/
 ```
 
-### Step 5 — Place `CASIA2.0` & `splits` folders into `data` folder of the repository
+### Step 5: Place `CASIA2.0` & `splits` folders into `data` folder of the repository
 - After unzipping the `Data.zip` file you will get a folder called `Data`
 - Inside `Data` are 2 folder called `CASIA2.0` & `splits`
 - Move `CASIA2.0` & `splits` into `data` folder of the repository/source code 
 - You move folder by simply drag-and-drop via `Files` tab of Colab
 
-### Step 6 — Install dependencies
+### Step 6: Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 7 — Run test
+### Step 7: Run test
 ```bash
 python test.py
 ```
