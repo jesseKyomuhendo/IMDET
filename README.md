@@ -9,21 +9,21 @@ Detects two types: **copy-move** and **splicing**, plus authentic images.
 
 ```
 IMDET/
-├── data/                  ← Dataset folder (not included in repo, download separately)
-├── model/                 ← Trained model (included in submission ZIP)
-├── results/               ← Evaluation results saved here (JSON)
+├── data/                  - Dataset folder (not included in repo, download separately)
+├── model/                 - Trained model (included in submission ZIP)
+├── results/               - Evaluation results saved here (JSON)
 ├── settings/
 │   └── SettingsAssistant.py
 ├── source/
-│   ├── dataset.py         ← Data pipeline. Loads images from disk in batches and prepares them for the model (resize, normalize, augment)
-│   ├── evaluate.py        ← Evaluation functions
-│   ├── model.py           ← Two-stream architecture
-│   ├── split_dataset.py   ← Dataset split script
-│   └── train.py           ← Training script
-├── config.yaml            ← All parameters and paths
+│   ├── dataset.py         - Data pipeline. Loads images from disk in batches and prepares them for the model (resize, normalize, augment)
+│   ├── evaluate.py        - Evaluation functions
+│   ├── model.py           - Two-stream architecture
+│   ├── split_dataset.py   - Dataset split script
+│   └── train.py           - Training script
+├── config.yaml            - All parameters and paths
 ├── requirements.txt
 ├── README.md
-└── test.py                ← Run this to reproduce results
+└── test.py                - Run this to reproduce results
 ```
 
 ---
