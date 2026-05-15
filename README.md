@@ -135,23 +135,7 @@ The imbalance strategy and all other hyperparameters can be configured in `confi
 
 ## Configuration
 
-All parameters are defined in `config.yaml`. No hardcoded values exist in any source file.
-
-Key settings:
-```yaml
-training:
-  epochs: 100
-  batch_size: 32
-  learning_rate: 0.00001
-  early_stopping_patience: 45
-  imbalance_strategy: class_weights
-
-model:
-  backbone: resnet50
-  pretrained: true
-  num_classes: 3
-```
-
+All parameters are defined in `config.yaml`. 
 
 ---
 
